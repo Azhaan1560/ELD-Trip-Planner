@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc -t markdown \"new-full-stack-dev-assessment.docx\")"
+    ]
+  }
+}
