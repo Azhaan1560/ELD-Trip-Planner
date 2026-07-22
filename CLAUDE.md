@@ -65,7 +65,7 @@ If a request is ambiguous about scope ("help me with the log sheet"), ask what s
 | Backend | Django + Django REST Framework | venv-based, not Docker |
 | Frontend | React via Vite | React 19 |
 | Styling | Tailwind CSS v4 | `@tailwindcss/vite` plugin, no PostCSS config needed |
-| Map/routing | **GraphHopper** | User switched to this after OpenRouteService signup issues. Free tier ~500 req/day. |
+| Map/routing | **GraphHopper** | User switched to this after OpenRouteService signup issues. Free tier ~500 req/day. Routes use `vehicle=car` — free key has no `truck` profile. |
 | Geocoding | GraphHopper Geocoding API (or Nominatim as fallback) | |
 | Map rendering | react-leaflet + OpenStreetMap tiles | Free, no key needed for tiles |
 | Backend hosting | Render (free web service tier) | Vercel doesn't run Django well; frontend-only on Vercel |
@@ -133,3 +133,4 @@ Record anything non-obvious decided mid-project here so future sessions don't re
 
 - 2026-07-22: Switched from OpenRouteService to GraphHopper (ORS signup was failing repeatedly).
 - 2026-07-22: Single-page layout confirmed over multi-route SPA — time budget doesn't support routing overhead.
+- 2026-07-23: Routing calls GraphHopper with `vehicle=car`, not `truck`. GraphHopper's free-tier API key doesn't include the truck routing profile (that's a paid feature). This means distance/duration/geometry come from car-legal roads and don't account for truck-specific restrictions (weight limits, low bridges, hazmat lanes). Accepted as a known simplification — still reasonably accurate for HOS planning purposes, which is what's graded.

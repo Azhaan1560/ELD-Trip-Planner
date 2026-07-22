@@ -30,6 +30,10 @@ Per the assessment brief, the planner assumes:
 
 HOS limits applied: 11-hour driving limit, 14-hour on-duty window, 30-minute break required after 8 hours of driving, 10 consecutive hours off duty between shifts, 70-hour/8-day cycle cap.
 
+## Known limitations
+
+- **Routing uses GraphHopper's `car` profile, not `truck`.** The free-tier GraphHopper API key doesn't include truck routing. Distance, duration, and route geometry are computed on car-legal roads and don't account for truck-specific restrictions (weight limits, low clearances, hazmat lanes). Numbers are still reasonably accurate for HOS planning purposes.
+
 ## Tech stack
 
 | Layer | Choice |
