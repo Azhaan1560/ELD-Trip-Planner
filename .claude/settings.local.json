@@ -2,6 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(pandoc -t markdown \"new-full-stack-dev-assessment.docx\")"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Grep(**/.env)",
+      "Grep(**/.env.*)",
+      "Glob(**/.env)",
+      "Glob(**/.env.*)"
     ]
   }
 }

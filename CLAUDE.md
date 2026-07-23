@@ -86,31 +86,37 @@ ELD-Trip-Planner/
 │   │   ├── urls.py
 │   │   └── wsgi.py
 │   └── trips/                  # single Django app
-│       ├── models.py           # Trip model (optional persistence)
+│       ├── models.py           # Trip model (unused — pure compute, no persistence)
 │       ├── serializers.py      # DRF serializer for input/output
 │       ├── views.py            # POST /api/trip/plan/
 │       ├── urls.py
 │       └── services/
-│           ├── routing.py      # calls GraphHopper routing
-│           ├── geocoding.py    # calls GraphHopper/Nominatim geocoding
-│           └── hos_planner.py  # HOS rules -> timeline of duty segments
+│           ├── routing.py       # calls GraphHopper routing (2 leg calls: current→pickup, pickup→dropoff)
+│           ├── geocoding.py      # calls GraphHopper geocoding
+│           ├── hos_constants.py  # HOS limits/durations as named constants
+│           ├── hos_scheduler.py  # low-level drive() simulation engine (the physics)
+│           └── hos_planner.py    # trip-level orchestration + day-splitting (the public entry point)
 │
 ├── frontend/                   # React (Vite)
 │   ├── package.json
 │   ├── vite.config.js
-│   ├── .env                    # VITE_API_URL
+│   ├── .env                    # VITE_API_URL (Claude is blocked from reading .env — see decisions log)
 │   ├── index.html
 │   └── src/
 │       ├── main.jsx
-│       ├── App.jsx             # the one page
-│       ├── api.js              # fetch wrapper
-│       ├── components/
-│       │   ├── TripForm.jsx    # 4 inputs
-│       │   ├── RouteMap.jsx    # react-leaflet
-│       │   ├── TripSummary.jsx # miles, drive time, # of days
-│       │   └── LogSheet.jsx    # SVG log grid + drawn timeline
-│       └── styles/
-│           └── index.css
+│       ├── App.jsx             # the one page; also computes per-day mileage client-side
+│       ├── api.js              # axios wrapper around POST /api/trip/plan/
+│       ├── index.css           # @import "tailwindcss"; + body bg override
+│       ├── assets/
+│       │   └── logo.png        # user-provided logo, used in Header + Footer
+│       └── components/
+│           ├── Header.jsx      # logo, anchor nav (#assumptions/#tech-stack), GitHub link
+│           ├── Footer.jsx      # dark footer: brand blurb / assumptions / tech stack + copyright bar
+│           ├── Logo.jsx         # unused legacy hand-drawn SVG mark, superseded by assets/logo.png
+│           ├── TripForm.jsx    # 4 required inputs + optional driver name, wrapped in a card
+│           ├── RouteMap.jsx    # react-leaflet route + start/pickup/dropoff pins + stop chips
+│           ├── TripSummary.jsx # miles, drive time, # of days, cycle used after trip
+│           └── LogSheet.jsx    # SVG log grid + drawn timeline + remarks row + signature line
 │
 ├── README.md
 ├── CLAUDE.md                   # this file
@@ -120,12 +126,12 @@ ELD-Trip-Planner/
 ## Phases (tracked via TaskList in-session; this is the durable reference)
 
 0. **Local setup** — venv, Django project, Vite React app, Tailwind wired. ✅ Done (2026-07-22)
-1. **Backend skeleton** — DRF, CORS, `POST /api/trip/plan/` returning a dummy response, input serializer
-2. **GraphHopper integration** — geocoding + routing, returns geometry/distance/duration
-3. **HOS planner logic (the core)** — rules engine producing per-day duty-status timelines
-4. **Frontend map** — form, react-leaflet route rendering, summary stat tiles
-5. **LogSheet SVG component** — draw the 24hr x 4-row grid per day, matching `blank-paper-log.png` proportions
-6. **Deploy** — Render (backend) + Vercel (frontend), README finalized, Loom recorded, repo shared
+1. **Backend skeleton** — DRF, CORS, `POST /api/trip/plan/` returning a dummy response, input serializer. ✅ Done (2026-07-23)
+2. **GraphHopper integration** — geocoding + routing, returns geometry/distance/duration. ✅ Done (2026-07-23) — later refactored to 2 separate leg calls (see decisions log)
+3. **HOS planner logic (the core)** — rules engine producing per-day duty-status timelines. ✅ Done (2026-07-23)
+4. **Frontend map** — form, react-leaflet route rendering, summary stat tiles, header/footer, logo. ✅ Done (2026-07-23)
+5. **LogSheet SVG component** — draw the 24hr x 4-row grid per day, matching `blank-paper-log.png` proportions, plus remarks row + signature line. ✅ Done (2026-07-23)
+6. **Deploy** — Render (backend) + Vercel (frontend), README finalized, Loom recorded, repo shared. 🔄 In progress
 
 ## Decisions log
 
@@ -134,3 +140,12 @@ Record anything non-obvious decided mid-project here so future sessions don't re
 - 2026-07-22: Switched from OpenRouteService to GraphHopper (ORS signup was failing repeatedly).
 - 2026-07-22: Single-page layout confirmed over multi-route SPA — time budget doesn't support routing overhead.
 - 2026-07-23: Routing calls GraphHopper with `vehicle=car`, not `truck`. GraphHopper's free-tier API key doesn't include the truck routing profile (that's a paid feature). This means distance/duration/geometry come from car-legal roads and don't account for truck-specific restrictions (weight limits, low bridges, hazmat lanes). Accepted as a known simplification — still reasonably accurate for HOS planning purposes, which is what's graded.
+- 2026-07-23: Routing switched from one combined 3-point GraphHopper call to two separate leg calls (`current→pickup`, `pickup→dropoff`). A single combined route doesn't expose where the pickup stop falls in the timeline; two calls give exact per-leg distance/duration so the HOS planner can insert the 1-hour pickup stop at the right point, and the frontend can compute per-day mileage without any backend changes.
+- 2026-07-23: HOS planner logic split into 3 files instead of one: `hos_constants.py` (named limits), `hos_scheduler.py` (the low-level `drive()` simulation engine — the physics of the 11hr/14hr/8hr-break/cycle rules), `hos_planner.py` (trip-level orchestration: sequences current→pickup→dropoff and splits the result into calendar days).
+- 2026-07-23: 10-hour rests and 30-minute breaks are modeled as `off_duty`, not `sleeper_berth` — the Sleeper Berth row on every log sheet is always empty. Real drivers often use the sleeper berth for these; this is a documented simplification, not a bug.
+- 2026-07-23: Fuel stop duration assumed at 30 minutes — the assessment brief only specifies the 1,000-mile interval, not a duration. A reasonable estimate, not a given constraint.
+- 2026-07-23: Trip start date assumed to be "today" (Day 1 = current date, Day 2 = tomorrow, etc.) since the form only collects current cycle hours, not an actual start date/time. Log sheet dates are computed as `today + day offset` on the frontend.
+- 2026-07-23: Added an optional "Driver name" field to the frontend form — not part of the assessment's required inputs, purely to render a signature line on each log sheet. Never sent to the backend; frontend-only state.
+- 2026-07-23: "Total miles driving today" is computed entirely on the frontend (`App.jsx`), not the backend. It reconstructs which leg each driving segment belongs to by watching for the `"Pickup"` label as the leg-switch marker in the already-ordered segment list, then multiplies each driving segment's duration by that leg's average speed (`distance_miles / duration_hours`, already available from the routing response). Chosen specifically to avoid a backend change late in the project.
+- 2026-07-23: Added `.claude/settings.local.json` deny rules blocking `Read`/`Grep`/`Glob` on any `.env` file project-wide, once real production secrets (rotated `SECRET_KEY`, `GRAPHHOPPER_API_KEY`) started going into them ahead of deployment. Note: this doesn't block reading `.env` via a raw `Bash` command like `cat` — a known gap, accepted rather than over-broadly denying `Bash`.
+- 2026-07-23: Rotated `SECRET_KEY` (generated fresh via Django's `get_random_secret_key()`) and `GRAPHHOPPER_API_KEY` ahead of deploy; removed the hardcoded insecure fallback value from `settings.py` so no secret-shaped string ships in committed code.

@@ -33,6 +33,10 @@ HOS limits applied: 11-hour driving limit, 14-hour on-duty window, 30-minute bre
 ## Known limitations
 
 - **Routing uses GraphHopper's `car` profile, not `truck`.** The free-tier GraphHopper API key doesn't include truck routing. Distance, duration, and route geometry are computed on car-legal roads and don't account for truck-specific restrictions (weight limits, low clearances, hazmat lanes). Numbers are still reasonably accurate for HOS planning purposes.
+- **The Sleeper Berth row is always empty.** 10-hour rests and 30-minute breaks are modeled as regular off-duty time, not sleeper berth time — a simplification, since the app has no way to know whether a given truck has (or the driver used) a sleeper berth.
+- **Trip start is assumed to be "now."** The form doesn't collect a start date/time, so Day 1 of every log sheet is dated to the current date, Day 2 to the next day, and so on.
+- **Fuel stops are assumed to take 30 minutes.** The assessment specifies the 1,000-mile interval but not a duration — 30 minutes is a reasonable estimate, not a given constraint.
+- **The 70-hour/8-day cycle is not modeled as a true rolling window.** Since the app only receives a single "current cycle used" number (not a day-by-day history), hours accumulate forward from that starting value rather than "rolling off" after 8 days. This can only make the schedule more conservative than reality, never less compliant.
 
 ## Tech stack
 
@@ -52,10 +56,20 @@ HOS limits applied: 11-hour driving limit, 14-hour on-duty window, 30-minute bre
 ELD-Trip-Planner/
 ├── backend/          # Django project + trips app
 │   └── trips/
-│       └── services/ # routing, geocoding, HOS planner logic
+│       └── services/
+│           ├── routing.py       # GraphHopper routing (2 leg calls)
+│           ├── geocoding.py     # GraphHopper geocoding
+│           ├── hos_constants.py # HOS limits as named constants
+│           ├── hos_scheduler.py # low-level drive() simulation engine
+│           └── hos_planner.py   # trip orchestration + day-splitting
 ├── frontend/          # React (Vite) app
 │   └── src/
+│       ├── api.js
+│       ├── assets/logo.png
 │       └── components/
+│           ├── Header.jsx, Footer.jsx
+│           ├── TripForm.jsx, TripSummary.jsx
+│           ├── RouteMap.jsx, LogSheet.jsx
 └── README.md
 ```
 
@@ -89,6 +103,7 @@ Backend runs at `http://127.0.0.1:8000/`.
 ```bash
 cd frontend
 npm install
+npm install axios react-leaflet leaflet
 ```
 
 Create `frontend/.env`:
@@ -118,9 +133,35 @@ Request body:
 }
 ```
 
-Response: route geometry/distance/duration plus a list of daily log entries, each containing the duty-status timeline for that day.
+Response:
 
-_(Exact response schema documented here once Phase 2/3 land.)_
+```json
+{
+  "current_location": "Chicago, IL",
+  "pickup_location": "St. Louis, MO",
+  "dropoff_location": "Dallas, TX",
+  "current_cycle_used": 24,
+  "route": {
+    "leg_to_pickup": { "distance_miles": 297.0, "duration_hours": 4.57, "geometry": [[lat, lng], ...] },
+    "leg_to_dropoff": { "distance_miles": 633.5, "duration_hours": 10.0, "geometry": [[lat, lng], ...] },
+    "total_distance_miles": 930.5,
+    "total_duration_hours": 14.57
+  },
+  "daily_logs": [
+    {
+      "day": 1,
+      "segments": [
+        { "status": "driving", "label": "Driving", "start_hour": 0.0, "end_hour": 4.57 },
+        { "status": "on_duty_not_driving", "label": "Pickup", "start_hour": 4.57, "end_hour": 5.57 },
+        { "status": "off_duty", "label": "30-minute break", "start_hour": 9.0, "end_hour": 9.5 },
+        { "status": "off_duty", "label": "10-hour rest", "start_hour": 12.5, "end_hour": 22.5 }
+      ]
+    }
+  ]
+}
+```
+
+`status` is one of `driving`, `off_duty`, `on_duty_not_driving` (the `sleeper_berth` row on the log sheet exists visually but is never populated — see Known limitations). `start_hour`/`end_hour` are decimal hours from midnight of that day's sheet (e.g. `9.5` = 9:30am). Per-day mileage and driver-signature data are computed entirely on the frontend, not returned by this endpoint.
 
 ## Deployment
 

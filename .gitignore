@@ -9,6 +9,7 @@ __pycache__/
 .env.*
 db.sqlite3
 *.db
+staticfiles/
 
 node_modules/
 dist/
