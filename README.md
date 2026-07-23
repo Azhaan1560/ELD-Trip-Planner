@@ -6,7 +6,8 @@ Built with Django (backend) + React (frontend).
 
 ## Live demo
 
-- App: _link pending deployment_
+- App: [eld-trip-planner-six-dusky.vercel.app](https://eld-trip-planner-six-dusky.vercel.app/)
+- Backend API: [eld-trip-planner-api-yame.onrender.com](https://eld-trip-planner-api-yame.onrender.com)
 - Loom walkthrough: _link pending recording_
 
 ## What it does
@@ -165,8 +166,9 @@ Response:
 
 ## Deployment
 
-- Backend deployed to Render as a web service (gunicorn, `ALLOWED_HOSTS` set to the Render domain).
-- Frontend deployed to Vercel, `VITE_API_URL` pointed at the Render backend URL.
+- Backend deployed to Render as a web service (gunicorn + whitenoise, `ALLOWED_HOSTS`/`CORS_ALLOWED_ORIGINS` set to the live domains).
+- Frontend deployed to Vercel, `VITE_API_URL` pointed at the Render backend URL at build time.
+- **Note:** the backend is on Render's free tier, which spins down after 15 minutes of inactivity. The first request after idling can take 30-60 seconds to respond while the service wakes up — this is expected, not a bug.
 
 ## Author notes
 
