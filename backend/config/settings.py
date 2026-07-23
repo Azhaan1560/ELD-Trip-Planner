@@ -122,7 +122,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-CORS_ALLOW_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'https://localhost:5173').split(',')
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
 
 REST_FRAMEWORK ={
     'DEFAULT_RENDERER_CLASSES': [
